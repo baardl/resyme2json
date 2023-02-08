@@ -7,7 +7,7 @@ import java.io.File;
 import java.io.IOException;
 
 
-public class Main {
+public class ExtractText {
     //Create method to extract text from pdf file
     public static String extractTextFromPdf(String pdfFilePath) {
         String text = "";
