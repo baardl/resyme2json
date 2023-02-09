@@ -20,10 +20,12 @@ public class Text2Json {
         OPENAI_API_KEY = openaiApiKey;
     }
 
-    public String queryGPT3(String text) {
+    public String queryGPT3(String text, boolean doCleanup) {
         //read OPENAI_TOKEN from environment variable
         String question = "Summarize the text below into a JSON with exactly the following structure {basic_info: {first_name, last_name, full_name, email, phone_number, location, portfolio_website_url, linkedin_url, github_main_page_url, university, education_level (BS, MS, or PhD), graduation_year, graduation_month, majors, GPA}, work_experience: [{job_title, company, location, duration: {start, end}, job_summary}], project_experience:[{project_name, duration: {start, end}, project_discription}]}";
-        //text = cleanup(text);
+        if (doCleanup) {
+            text = cleanup(text);
+        }
         log.debug("text: {}", text);
         if (isEmpty(text)) {
             log.warn("text is empty");
@@ -31,7 +33,7 @@ public class Text2Json {
         }
         String prompt = question + "\n" + text;
         int maxTokens = 1800;
-        int estimatedPromptTokens = 2130; //see https://platform.openai.com/tokenizer (int) (text.split(" ").length * 1.6);
+        int estimatedPromptTokens = calculateTokens(text); //see https://platform.openai.com/tokenizer (int) (text.split(" ").length * 1.6);
         log.debug("estimated prompt tokens: {}", estimatedPromptTokens);
 
         int estimatedAnswerTokens = 4000 - estimatedPromptTokens;
@@ -39,6 +41,7 @@ public class Text2Json {
             log.warn("estimated_answer_tokens lower than max_tokens, changing max_tokens to {}", estimatedAnswerTokens);
             maxTokens = estimatedAnswerTokens;
         }
+        log.debug("estimated_answer_tokens: {}", estimatedAnswerTokens);
         String engine = "text-davinci-002";
         double temperature = 0.0;
         double topP = 1;
@@ -54,7 +57,7 @@ public class Text2Json {
                         presence_penalty: int = 0
          */
 
-        maxTokens = 1400; //4096 - estimatedPromptTokens; //1600; //min(4096-estimatedPromptTokens, maxTokens);
+//        maxTokens = 1400; //4096 - estimatedPromptTokens; //1600; //min(4096-estimatedPromptTokens, maxTokens);
         log.debug("maxTokens: {}", maxTokens);
         OpenAiService service = new OpenAiService(OPENAI_API_KEY, 60);
         CompletionRequest completionRequest = CompletionRequest.builder()
@@ -114,6 +117,15 @@ public class Text2Json {
         text = text.replaceAll("http[s]?(://)?", "");
         text = text.replaceAll("[^A-Za-z0-9\s]", "b");
         return text;
+    }
+
+    public static int calculateTokens(String text) {
+
+//        StringTokenizer str_arr = new StringTokenizer(text, " ");
+//            int count = str_arr.countTokens();
+//            return count;
+
+        return (int) (text.split(" ").length * 1.6);
     }
 
     //    Base function for querying GPT-3.

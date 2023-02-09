@@ -13,10 +13,12 @@ public class Text2JsonManualTest {
     private static final Logger log = getLogger(Text2JsonManualTest.class);
 
     public static void main(String[] args) throws JSONException {
-//        String pdfFilePath = "src/test/resources/bardlind-cv.pdf";
-//        String text = ExtractText.extractTextFromPdf(pdfFilePath);
-        String txtFilePath = "src/test/resources/cv-text.txt";
-        String text = ExtractText.readText(txtFilePath);
+      boolean doCleanup = true;
+        String pdfFilePath = "src/test/resources/bardlind-cv.pdf";
+        String text = ExtractText.extractTextFromPdf(pdfFilePath);
+//        doCleanup = false;
+//        String txtFilePath = "src/test/resources/cv-text.txt";
+//        String text = ExtractText.readText(txtFilePath);
         assertTrue(text.contains("Lind"));
         String token = System.getenv("OPENAI_API_KEY");
         if (isEmpty(token)) {
@@ -26,7 +28,8 @@ public class Text2JsonManualTest {
         long start = System.currentTimeMillis();
         try {
             Text2Json text2Json = new Text2Json(token);
-            String jsonString = text2Json.queryGPT3(text);
+
+            String jsonString = text2Json.queryGPT3(text,doCleanup);
             long end = System.currentTimeMillis();
             log.info("elapsed: " + (end - start) + " ms");
             assertFalse(isEmpty(jsonString));
