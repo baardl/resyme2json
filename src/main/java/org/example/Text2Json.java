@@ -2,25 +2,88 @@ package org.example;
 
 import com.theokanning.openai.OpenAiService;
 import com.theokanning.openai.completion.CompletionRequest;
+import org.slf4j.Logger;
+import retrofit2.HttpException;
+
+import static org.example.Resyme2Json.isEmpty;
+import static org.slf4j.LoggerFactory.getLogger;
 
 public class Text2Json {
     //connect to openai's gpt3 api
+    private static final Logger log = getLogger(Text2Json.class);
+
+    private final String OPENAI_API_KEY;
 
     public static final String QUESTION = "Summarize the text below into a JSON with exactly the following structure {basic_info: {first_name, last_name, full_name, email, phone_number, location, portfolio_website_url, linkedin_url, github_main_page_url, university, education_level (BS, MS, or PhD), graduation_year, graduation_month, majors, GPA}, work_experience: [{job_title, company, location, duration: {start, end}, job_summary}], project_experience:[{project_name, duration: {start, end}, project_discription}]}";
 
+    public Text2Json(String openaiApiKey) {
+        OPENAI_API_KEY = openaiApiKey;
+    }
+
     public String queryGPT3(String text) {
         //read OPENAI_TOKEN from environment variable
+        String question = "Summarize the text below into a JSON with exactly the following structure {basic_info: {first_name, last_name, full_name, email, phone_number, location, portfolio_website_url, linkedin_url, github_main_page_url, university, education_level (BS, MS, or PhD), graduation_year, graduation_month, majors, GPA}, work_experience: [{job_title, company, location, duration: {start, end}, job_summary}], project_experience:[{project_name, duration: {start, end}, project_discription}]}";
+        //text = cleanup(text);
+        log.debug("text: {}", text);
+        if (isEmpty(text)) {
+            log.warn("text is empty");
+            return "";
+        }
+        String prompt = question + "\n" + text;
+        int maxTokens = 1800;
+        int estimatedPromptTokens = 2130; //see https://platform.openai.com/tokenizer (int) (text.split(" ").length * 1.6);
+        log.debug("estimated prompt tokens: {}", estimatedPromptTokens);
 
-        text = cleanup(text);
-        OpenAiService service = new OpenAiService("OPENAI_API_KEY");
+        int estimatedAnswerTokens = 4000 - estimatedPromptTokens;
+        if (estimatedAnswerTokens < maxTokens) {
+            log.warn("estimated_answer_tokens lower than max_tokens, changing max_tokens to {}", estimatedAnswerTokens);
+            maxTokens = estimatedAnswerTokens;
+        }
+        String engine = "text-davinci-002";
+        double temperature = 0.0;
+        double topP = 1;
+        double frequencyPenalty = 0;
+        double presencePenalty = 0;
+
+        /*
+         engine: str = 'text-curie-001',
+                        temperature: float = 0.0,
+                        max_tokens: int = 100,
+                        top_p: int = 1,
+                        frequency_penalty: int = 0,
+                        presence_penalty: int = 0
+         */
+
+        maxTokens = 1400; //4096 - estimatedPromptTokens; //1600; //min(4096-estimatedPromptTokens, maxTokens);
+        log.debug("maxTokens: {}", maxTokens);
+        OpenAiService service = new OpenAiService(OPENAI_API_KEY, 60);
         CompletionRequest completionRequest = CompletionRequest.builder()
-                .prompt("Somebody once told me the world is gonna roll me")
-                .model("ada")
-                .echo(true)
+                .prompt(prompt)
+                .model(engine)
+                .temperature(temperature)
+                .topP(topP)
+                .frequencyPenalty(frequencyPenalty)
+                .presencePenalty(presencePenalty)
+                .maxTokens(maxTokens)
                 .build();
-        service.createCompletion(completionRequest).getChoices().forEach(System.out::println);
+        try {
+            service.createCompletion(completionRequest).getChoices().forEach(System.out::println);
+        } catch (HttpException e) {
+            log.error("error: {}", e.getMessage());
+        }
+        /*
+        List<CompletionChoice> responseChoices = service.createCompletion(completionRequest).getChoices(); //.forEach(System.out::println);
         //query gpt3
         //return the response
+        for (CompletionChoice responseChoice : responseChoices) {
+            String response = responseChoice.getText();
+            log.debug("response: {}", response);
+            if (response.contains("basic_info")) {
+                return response;
+            }
+        }
+
+         */
         return null;
     }
 
@@ -41,26 +104,16 @@ public class Text2Json {
         service.createCompletion(completionRequest).getChoices().forEach(System.out::println);
     }
 
-    private static boolean isEmpty(String token) {
-        return token == null || token.isEmpty();
-    }
+
 
     protected String cleanup(String text) {
-        //remove all newlines
-        text = text.replaceAll("\\r\\n|\\r|\\n", " ");
-        //remove all tabs
-        text = text.replaceAll("\\t", " ");
-        //remove all multiple spaces
-        text = text.replaceAll("\\s+", " ");
-        //remove all leading and trailing spaces
-        text = text.trim();
-//        pdf_str = "\n\n".join(pdf)
-//        pdf_str = re.sub('\s[,.]', ',', pdf_str)
-//        pdf_str = re.sub('[\n]+', '\n', pdf_str)
-//        pdf_str = re.sub('[\s]+', ' ', pdf_str)
-//        pdf_str = re.sub('http[s]?(://)?', '', pdf_str)
+//        text = "\n\n".join(text);
+        text = text.replaceAll("\s[,.]", ",");
+        text = text.replaceAll("[\n]+", " ");
+        text = text.replaceAll("[\s]+", " ");
+        text = text.replaceAll("http[s]?(://)?", "");
+        text = text.replaceAll("[^A-Za-z0-9\s]", "b");
         return text;
-
     }
 
     //    Base function for querying GPT-3.
